@@ -1,43 +1,56 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
-func formHandler (w http.ResponseWriter, r *http.Request) {
-	if err:=r.ParseForm();err !=nil{
-		fmt.Fprintf(w, "ParseForm() err: %v",err)
-		return
-	}
-	fmt.Fprint(w, "POST request successful")
-	name := r.FormValue("name")
-	email := r.FormValue("email")
-	fmt.Fprintf(w, "Name= %s\n",name)
-	fmt.Fprintf(w, "Email= %s\n",email)
+type Movie struct {
+	ID       string    `json:"id"`
+	Isbn     string    `json:"isbn"`
+	Title    string    `json:"title"`
+	Director *Director `json:"director"`
+}
+type Director struct {
+	Firstname string `json:"firstname"`
+	Lastname  string `json:"lastname"`
 }
 
- 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/hello" {
-		http.Error(w, "404 not found.", http.StatusNotFound)
-		return
+var movies []Movie
+
+func getMovies(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movies)
+}
+
+func deleteMovie(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	for index, item := range movies {
+		if item.ID == params["id"] {
+			movies = append(movies[:index], movies[index+1:]...)
+			break
+		}
 	}
-	if r.Method != "GET" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
-	fmt.Fprintf(w, "Hello, World!")
+	json.NewEncoder(w).Encode(movies)
 }
 
 func main() {
-	fileServer := http.FileServer(http.Dir("./static"))
-	http.Handle("/",fileServer)
-	http.HandleFunc("/form",formHandler)
-	http.HandleFunc("/hello", helloHandler)
+	r := mux.NewRouter()
+
+	movies = append(movies, Movie{ID: "1", Isbn: "438227", Title: "Movie 1", Director: &Director{Firstname: "Sunil", Lastname: "kotte"}})
+	movies = append(movies, Movie{ID: "2", Isbn: "438228", Title: "Movie 2", Director: &Director{Firstname: "Navya", Lastname: "kotte"}})
+
+	r.HandleFunc("/movies", getMovies).Methods("GET")
+	// r.HandleFunc("/movies/{id}", getMovie).Methods("GET")
+	// r.HandleFunc("/movies/create", createMovie).Methods("POST")
+	// r.HandleFunc("/movies/update/{id}", updateMovie).Methods("PUT")
+	r.HandleFunc("/movies/delete/{id}", deleteMovie).Methods("DELETE")
+
 	fmt.Printf("starting server at port 8000\n")
-	if err := http.ListenAndServe(":8000", nil); err != nil {
-		log.Fatal(err)
-	}
+	log.Fatal(http.ListenAndServe(":8000", r))
 }
